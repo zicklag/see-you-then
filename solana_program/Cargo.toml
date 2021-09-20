@@ -1,0 +1,13 @@
+[package]
+name = "see_you_then"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+exclude_entrypoint = []
+
+[dependencies]
+solana-program = "1.7.12"
