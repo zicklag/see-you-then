@@ -35,15 +35,22 @@
     <q-btn
       v-if="!selectedWallet"
       label="Connect Wallet"
-      flat
+      :flat="flat"
       @click="showDialog = true"
+      :color="color"
     />
     <q-btn
       v-else-if="selectedWallet && !selectedWallet.adapter.connected"
-      flat
+      :flat="flat"
       label="Connecting..."
+      :color="color"
     />
-    <q-btn v-else flat @click="selectedWallet?.adapter.disconnect()">
+    <q-btn
+      v-else
+      :flat="flat"
+      @click="selectedWallet?.adapter.disconnect()"
+      :color="color"
+    >
       <div class="row items-center">
         <q-avatar class="q-mr-sm">
           <q-img :src="selectedWallet.wallet.icon" />
@@ -75,6 +82,10 @@ import { useQuasar } from 'quasar';
 
 export default defineComponent({
   name: 'WalletConnectButton',
+  props: {
+    color: String,
+    flat: Boolean,
+  },
   setup() {
     const $q = useQuasar();
     const showDialog = ref(false);

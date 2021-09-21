@@ -4,19 +4,45 @@
       <q-toolbar>
         <q-toolbar-title> See You Then™ </q-toolbar-title>
 
-        <wallet-connect-button />
+        <wallet-connect-button flat />
       </q-toolbar>
     </q-header>
 
     <q-page-container>
-      <router-view />
+      <transition name="fade">
+        <q-card
+          v-if="!selectedWallet?.adapter.connected"
+          class="absolute-center"
+        >
+          <q-card-section class="text-body1">
+            Connect a wallet to access your calendar.
+          </q-card-section>
+          <q-card-section class="row justify-center">
+            <wallet-connect-button color="primary" />
+          </q-card-section>
+        </q-card>
+        <router-view v-else />
+      </transition>
     </q-page-container>
   </q-layout>
 </template>
 
+<style lang="scss">
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>
+
 <script lang="ts">
 import WalletConnectButton from 'components/WalletConnectButton.vue';
 import { defineComponent } from 'vue';
+import { selectedWallet } from '../utils/wallet';
 
 export default defineComponent({
   name: 'MainLayout',
@@ -24,7 +50,9 @@ export default defineComponent({
   components: { WalletConnectButton },
 
   setup() {
-    return {};
+    return {
+      selectedWallet,
+    };
   },
 });
 </script>
