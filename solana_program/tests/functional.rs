@@ -43,11 +43,8 @@ async fn time_slot_create_and_schedule() {
             payer_keypair.pubkey(),
             time_slot_keypair.pubkey(),
             TimeSlotTime {
-                day_time_start_secs: 0,
-                day_time_end_secs: 120,
-                year: 2021,
-                month: 10,
-                day: 3,
+                start: 0.0,
+                end: 120.0,
             },
             "My meeting".to_string(),
         )],
@@ -68,11 +65,8 @@ async fn time_slot_create_and_schedule() {
     let parsed_time_slot = TimeSlot::try_from_slice(&time_slot_account.data).expect("Deserialize");
     assert_eq!(parsed_time_slot.is_scheduled, false);
     assert_eq!(parsed_time_slot.owner, payer_keypair.pubkey());
-    assert_eq!(parsed_time_slot.time.day_time_start_secs, 0);
-    assert_eq!(parsed_time_slot.time.day_time_end_secs, 120);
-    assert_eq!(parsed_time_slot.time.month, 10);
-    assert_eq!(parsed_time_slot.time.year, 2021);
-    assert_eq!(parsed_time_slot.time.day, 3);
+    assert_eq!(parsed_time_slot.time.start, 0.0);
+    assert_eq!(parsed_time_slot.time.end, 120.0);
     assert_eq!(parsed_time_slot.meeting_id, "My meeting".to_string());
 
     // Now create a new account that will schedule a meeting

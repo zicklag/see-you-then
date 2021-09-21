@@ -109,12 +109,12 @@ pub struct Reservation {
 }
 
 #[derive(Debug, BorshDeserialize, BorshSerialize, BorshSchema)]
+/// The time slot range
 pub struct TimeSlotTime {
-    pub day_time_start_secs: u32,
-    pub day_time_end_secs: u32,
-    pub year: u16,
-    pub month: u8,
-    pub day: u8,
+    /// The start of the time slot in seconds relative to the unix epoch
+    pub start: f64,
+    /// The end of the time slot in seconds relative to the unix epoch
+    pub end: f64,
 }
 
 pub fn process_instruction(
