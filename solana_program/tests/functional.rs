@@ -4,7 +4,8 @@
 use std::str::FromStr;
 
 use borsh::BorshDeserialize;
-use see_you_then::{create_time_slot, TimeSlot, TimeSlotTime};
+use see_you_then::{create_time_slot, schedule_meeting, Reservation, TimeSlot, TimeSlotTime};
+use solana_program::{system_instruction, system_program};
 
 use {
     see_you_then::process_instruction,
@@ -31,16 +32,16 @@ fn program_test() -> ProgramTest {
 
 #[tokio::test]
 async fn time_slot_create_and_schedule() {
-    let time_slot = Keypair::new();
+    let time_slot_keypair = Keypair::new();
 
-    let (mut banks_client, payer, recent_blockhash) = program_test().start().await;
+    let (mut banks_client, payer_keypair, recent_blockhash) = program_test().start().await;
 
-    // Create a new feature proposal
+    // Create a new time slot
     let mut transaction = Transaction::new_with_payer(
         &[create_time_slot(
             program_id(),
-            payer.pubkey(),
-            time_slot.pubkey(),
+            payer_keypair.pubkey(),
+            time_slot_keypair.pubkey(),
             TimeSlotTime {
                 day_time_start_secs: 0,
                 day_time_end_secs: 120,
@@ -48,15 +49,16 @@ async fn time_slot_create_and_schedule() {
                 month: 10,
                 day: 3,
             },
+            "My meeting".to_string(),
         )],
-        Some(&payer.pubkey()),
+        Some(&payer_keypair.pubkey()),
     );
-    transaction.sign(&[&payer, &time_slot], recent_blockhash);
+    transaction.sign(&[&payer_keypair, &time_slot_keypair], recent_blockhash);
     banks_client.process_transaction(transaction).await.unwrap();
 
     // Confirm that the new time slot has been created
     let time_slot_account = banks_client
-        .get_account(time_slot.pubkey())
+        .get_account(time_slot_keypair.pubkey())
         .await
         .expect("success")
         .expect("some account");
@@ -64,11 +66,87 @@ async fn time_slot_create_and_schedule() {
 
     // Parse created time slot and verify data
     let parsed_time_slot = TimeSlot::try_from_slice(&time_slot_account.data).expect("Deserialize");
-    assert_eq!(parsed_time_slot.scheduled_with, None);
-    assert_eq!(parsed_time_slot.owner, payer.pubkey());
+    assert_eq!(parsed_time_slot.is_scheduled, false);
+    assert_eq!(parsed_time_slot.owner, payer_keypair.pubkey());
     assert_eq!(parsed_time_slot.time.day_time_start_secs, 0);
     assert_eq!(parsed_time_slot.time.day_time_end_secs, 120);
     assert_eq!(parsed_time_slot.time.month, 10);
     assert_eq!(parsed_time_slot.time.year, 2021);
     assert_eq!(parsed_time_slot.time.day, 3);
+    assert_eq!(parsed_time_slot.meeting_id, "My meeting".to_string());
+
+    // Now create a new account that will schedule a meeting
+    let scheduling_keypair = Keypair::new();
+    let mut transaction = Transaction::new_with_payer(
+        &[system_instruction::create_account(
+            &payer_keypair.pubkey(),
+            &scheduling_keypair.pubkey(),
+            10000000000,
+            0,
+            &system_program::ID,
+        )],
+        Some(&payer_keypair.pubkey()),
+    );
+    transaction.sign(&[&payer_keypair, &scheduling_keypair], recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    eprintln!(
+        "scheduling: {:?}\ntime_slot: {:?}\n",
+        scheduling_keypair.pubkey(),
+        time_slot_keypair.pubkey(),
+    );
+
+    // And a reservation keypair
+    let reservation_keypair = Keypair::new();
+
+    // Create a transaction to schedule the time slot with this new account
+    let mut transaction = Transaction::new_with_payer(
+        &[schedule_meeting(
+            program_id(),
+            scheduling_keypair.pubkey(),
+            reservation_keypair.pubkey(),
+            time_slot_keypair.pubkey(),
+            "John Doe".to_string(),
+        )],
+        Some(&scheduling_keypair.pubkey()),
+    );
+    transaction.sign(
+        &[
+            &scheduling_keypair,
+            &reservation_keypair,
+            &time_slot_keypair,
+        ],
+        recent_blockhash,
+    );
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    // Get the new reservation account
+    let reservation_account = banks_client
+        .get_account(reservation_keypair.pubkey())
+        .await
+        .unwrap()
+        .unwrap();
+    let parsed_reservation =
+        Reservation::try_from_slice(&reservation_account.data).expect("Deserialize");
+
+    // Get the updated time slot
+    let time_slot_account = banks_client
+        .get_account(time_slot_keypair.pubkey())
+        .await
+        .unwrap()
+        .unwrap();
+    let parsed_time_slot = TimeSlot::try_from_slice(&time_slot_account.data).expect("Deserialize");
+
+    // Verify that the registration succeeded
+    assert_eq!(parsed_time_slot.is_scheduled, true);
+    assert_eq!(
+        parsed_time_slot.scheduled_with_account,
+        scheduling_keypair.pubkey()
+    );
+
+    assert_eq!(
+        parsed_reservation.time_slot_account,
+        time_slot_keypair.pubkey()
+    );
+    assert_eq!(parsed_reservation.name, "John Doe".to_string());
 }
