@@ -13,5 +13,6 @@ export * from './sollet';
 export * from './solletExtension';
 // export * from './solong';
 // export * from './torus';
-// export * from './types';
 // export * from './walletconnect';
+
+export * from './types';

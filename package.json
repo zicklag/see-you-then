@@ -12,8 +12,11 @@
   "dependencies": {
     "@quasar/extras": "^1.0.0",
     "@solana/wallet-adapter-base": "^0.6.0",
+    "@solana/wallet-adapter-wallets": "^0.10.0",
+    "bn.js": "^5.2.0",
+    "borsh": "^0.6.0",
+    "buffer": "^6.0.3",
     "core-js": "^3.6.5",
-    "crypto": "^1.0.1",
     "quasar": "^2.0.0"
   },
   "devDependencies": {

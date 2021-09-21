@@ -51,6 +51,7 @@
       @click="selectedWallet?.adapter.disconnect()"
       :color="color"
     >
+      <q-tooltip>Logout</q-tooltip>
       <div class="row items-center">
         <q-avatar class="q-mr-sm">
           <q-img :src="selectedWallet.wallet.icon" />
@@ -69,7 +70,6 @@
 
 <script lang="ts">
 import { defineComponent, ref, triggerRef } from 'vue';
-import { Wallet } from '@solana/wallet-adapter-wallets';
 import { selectedWallet } from '../utils/wallet';
 import {
   getSolletWallet,
@@ -77,6 +77,7 @@ import {
   getSolletExtensionWallet,
   getSolflareWallet,
   getSolflareWebWallet,
+  Wallet,
 } from '../lib/wallets';
 import { useQuasar } from 'quasar';
 
@@ -129,11 +130,12 @@ export default defineComponent({
         adapter.on('error', (e) => {
           $q.notify({
             type: 'negative',
-            message:
-              'Error accessing wallet' +
-              (e.message != '' ? ': ' + e.message : ''),
+            message: 'Wallet error' + (e.message != '' ? ': ' + e.message : ''),
           });
-          selectedWallet.value = null;
+
+          if (!selectedWallet.value?.adapter.connected) {
+            selectedWallet.value = null;
+          }
         });
 
         selectedWallet.value = {

@@ -3,8 +3,10 @@
 
 use std::str::FromStr;
 
-use borsh::BorshDeserialize;
-use see_you_then::{create_time_slot, schedule_meeting, Reservation, TimeSlot, TimeSlotTime};
+use borsh::{BorshDeserialize, BorshSerialize};
+use see_you_then::{
+    create_time_slot, schedule_meeting, Reservation, SeeYouThenInstruction, TimeSlot, TimeSlotTime,
+};
 use solana_program::{system_instruction, system_program};
 
 use {
@@ -168,4 +170,19 @@ async fn time_slot_create_and_schedule() {
 
     // Make sure that it doesn't let us double-book
     assert_eq!(result.is_err(), true);
+}
+
+#[test]
+fn dump_time_slot_time() {
+    let data = SeeYouThenInstruction::CreateTimeSlot {
+        time: TimeSlotTime {
+            start: 0.0,
+            end: 120.0,
+        },
+        meeting_id: String::from("My meeting"),
+    }
+    .try_to_vec()
+    .expect("IO error");
+
+    panic!("{:?}", data);
 }
