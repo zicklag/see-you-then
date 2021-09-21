@@ -149,4 +149,29 @@ async fn time_slot_create_and_schedule() {
         time_slot_keypair.pubkey()
     );
     assert_eq!(parsed_reservation.name, "John Doe".to_string());
+
+    // Try to double-book the time slot
+    let reservation_2_keypair = Keypair::new();
+    let mut transaction = Transaction::new_with_payer(
+        &[schedule_meeting(
+            program_id(),
+            scheduling_keypair.pubkey(),
+            reservation_2_keypair.pubkey(),
+            time_slot_keypair.pubkey(),
+            "John Doe 2".to_string(),
+        )],
+        Some(&scheduling_keypair.pubkey()),
+    );
+    transaction.sign(
+        &[
+            &scheduling_keypair,
+            &reservation_2_keypair,
+            &time_slot_keypair,
+        ],
+        recent_blockhash,
+    );
+    let result = banks_client.process_transaction(transaction).await;
+
+    // Make sure that it doesn't let us double-book
+    assert_eq!(result.is_err(), true);
 }
