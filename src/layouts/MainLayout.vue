@@ -16,7 +16,7 @@
 
 <script lang="ts">
 import WalletConnectButton from 'components/WalletConnectButton.vue';
-import { defineComponent, ref } from 'vue';
+import { defineComponent } from 'vue';
 
 export default defineComponent({
   name: 'MainLayout',
