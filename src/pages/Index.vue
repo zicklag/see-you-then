@@ -153,8 +153,7 @@ export default defineComponent({
     const currentDayTimeSlots = computed(() => {
       return timeSlots.value
         .filter((x) => is_same_day(selectedDate.value, x.time.start as Date))
-        .sort()
-        .reverse();
+        .sort((a, b) => a.time.start.valueOf() - b.time.start.valueOf());
     });
 
     watch(currentDayTimeSlots, (slots) => {
@@ -177,7 +176,9 @@ export default defineComponent({
       });
 
       subscribeToTimeSlots(calendarPubkey, (timeSlot) => {
-        const newTimeSlots = timeSlots.value.filter((x) => x.id != timeSlot.id);
+        const newTimeSlots = timeSlots.value.filter(
+          (x) => !x.id.equals(timeSlot.id)
+        );
         newTimeSlots.push(timeSlot);
         timeSlots.value = newTimeSlots;
       });

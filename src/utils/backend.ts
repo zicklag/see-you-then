@@ -8,7 +8,7 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
-import { useQuasar } from 'quasar';
+import { Notify } from 'quasar';
 import { selectedWallet } from './wallet';
 
 const programId = new PublicKey('F1EdFSDRttLzmcKvwkF6VTL4fSyDTyo3xx68kxSCdSwE');
@@ -22,11 +22,10 @@ export async function createTimeSlot(
     meetingId = btoa(Math.random().toString());
   }
 
-  const $q = useQuasar();
   const wallet = selectedWallet.value;
 
   if (!wallet || !wallet.adapter.publicKey) {
-    $q.notify({
+    Notify.create({
       type: 'negative',
       message: 'Could not create time slot: wallet not connected',
     });
@@ -108,11 +107,10 @@ export async function createTimeSlot(
 }
 
 export async function scheduleMeeting(timeSlot: PublicKey, username: string) {
-  const $q = useQuasar();
   const wallet = selectedWallet.value;
 
   if (!wallet || !wallet.adapter.publicKey) {
-    $q.notify({
+    Notify.create({
       type: 'negative',
       message: 'Could not create time slot: wallet not connected',
     });
@@ -186,7 +184,7 @@ export async function scheduleMeeting(timeSlot: PublicKey, username: string) {
   );
   console.log('Completed transaction', transactionId);
 
-  $q.notify({
+  Notify.create({
     type: 'positive',
     message: 'Successfully scheduled meeting! 🎉',
   });
@@ -266,7 +264,6 @@ function deserializeTimeSlot(accountId: PublicKey, data: Buffer): TimeSlot {
   nextBytes(1);
 
   const scheduledWithBytes = data.subarray(cursor, cursor + nextBytes(32));
-  console.log(scheduledWithBytes);
   const scheduledWith = new PublicKey(scheduledWithBytes);
 
   const meetingIdStrLen = data.readUInt32LE(cursor);
