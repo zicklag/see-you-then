@@ -21,7 +21,6 @@ export async function createTimeSlot(
   if (!meetingId || meetingId == '') {
     meetingId = btoa(Math.random().toString());
   }
-  console.log('meetingId', meetingId);
 
   const $q = useQuasar();
   const wallet = selectedWallet.value;
@@ -108,6 +107,91 @@ export async function createTimeSlot(
   console.log('Completed transaction', transactionId);
 }
 
+export async function scheduleMeeting(timeSlot: PublicKey, username: string) {
+  const $q = useQuasar();
+  const wallet = selectedWallet.value;
+
+  if (!wallet || !wallet.adapter.publicKey) {
+    $q.notify({
+      type: 'negative',
+      message: 'Could not create time slot: wallet not connected',
+    });
+    return;
+  }
+
+  const ownerKey = new PublicKey(wallet.adapter.publicKey.toString());
+
+  // TODO: Take out for production
+  // Airdrop 1 sol so that we have enough for the transaction below
+  await connection.requestAirdrop(ownerKey, LAMPORTS_PER_SOL);
+
+  // Create a new account keypair to store the reservation in
+  const reservationKeypair = new Keypair();
+  const reservationCreateTransaction = new Transaction({
+    feePayer: ownerKey,
+    recentBlockhash: (await connection.getRecentBlockhash()).blockhash,
+  });
+
+  // Borsh serialize the reservation creation instruction. Ironically this is easier than using
+  // borsh.js 🙄
+  const strLen = Buffer.byteLength(username);
+  const buffer = Buffer.alloc(
+    // Instruction discriminant ( u8 )
+    1 +
+      // Size of the string size ( u32 )
+      4 +
+      // Size of the string
+      strLen
+  );
+  let cursor = 0;
+  cursor = buffer.writeUInt8(1, cursor);
+  cursor = buffer.writeUInt32LE(strLen, cursor);
+  buffer.write(username, cursor);
+
+  // Create transaction
+  reservationCreateTransaction.add(
+    new TransactionInstruction({
+      programId,
+      keys: [
+        {
+          pubkey: ownerKey,
+          isWritable: true,
+          isSigner: true,
+        },
+        {
+          pubkey: reservationKeypair.publicKey,
+          isWritable: true,
+          isSigner: true,
+        },
+        {
+          pubkey: timeSlot,
+          isWritable: true,
+          isSigner: false,
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isWritable: true,
+          isSigner: false,
+        },
+      ],
+      data: buffer,
+    })
+  );
+  reservationCreateTransaction.sign(reservationKeypair);
+
+  // Submit transaction
+  const transactionId = await wallet.adapter.sendTransaction(
+    reservationCreateTransaction,
+    connection
+  );
+  console.log('Completed transaction', transactionId);
+
+  $q.notify({
+    type: 'positive',
+    message: 'Successfully scheduled meeting! 🎉',
+  });
+}
+
 export interface TimeSlot {
   id: PublicKey;
   owner: PublicKey;
@@ -181,7 +265,8 @@ function deserializeTimeSlot(accountId: PublicKey, data: Buffer): TimeSlot {
   const isScheduled = data.readUInt8(cursor) == 1;
   nextBytes(1);
 
-  const scheduledWithBytes = data.subarray(cursor, nextBytes(32));
+  const scheduledWithBytes = data.subarray(cursor, cursor + nextBytes(32));
+  console.log(scheduledWithBytes);
   const scheduledWith = new PublicKey(scheduledWithBytes);
 
   const meetingIdStrLen = data.readUInt32LE(cursor);

@@ -1,5 +1,5 @@
 <template>
-  <q-page class="row items-center justify-evenly">
+  <q-page class="column justify-center items-center">
     <q-dialog v-model="showAddTimeSlotDialog">
       <q-card>
         <q-card-section>
@@ -37,6 +37,22 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-card class="text-center q-pa-md q-ma-md" v-if="$route.name == 'index'">
+      Share this
+      <router-link
+        :to="{
+          name: 'schedule',
+          params: { id: calendarPubkey ? calendarPubkey.toString() : '' },
+        }"
+      >
+        link</router-link
+      >
+      to allow people to reserve spots spots on your calendar.
+    </q-card>
+    <q-card v-else class="text-center q-pa-md q-ma-md">
+      Schedule a meeting with
+      {{ calendarPubkey ? calendarPubkey.toString() : '' }}
+    </q-card>
     <div class="row justify-center">
       <q-date
         v-model="selectedDateString"
@@ -51,6 +67,7 @@
           </q-item-section>
           <q-item-section avatar>
             <q-btn
+              v-if="$route.name == 'index'"
               icon="add"
               color="primary"
               round
@@ -60,7 +77,12 @@
             </q-btn>
           </q-item-section>
         </q-item>
-        <q-item v-for="timeSlot in currentDayTimeSlots" :key="timeSlot.id">
+        <q-item
+          v-for="timeSlot in currentDayTimeSlots"
+          :key="timeSlot.id"
+          :clickable="$route.name == 'schedule'"
+          @click="scheduleMeetingButton(timeSlot)"
+        >
           <q-item-section>
             <q-item-label>
               {{ format_time(timeSlot.time.start) }} -
@@ -87,14 +109,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from 'vue';
+import { defineComponent, ref, computed, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   createTimeSlot,
   getTimeSlots,
+  scheduleMeeting,
   subscribeToTimeSlots,
   TimeSlot,
 } from '../utils/backend';
-import { date as dateUtils } from 'quasar';
+import { date as dateUtils, useQuasar } from 'quasar';
 import { selectedWallet } from 'src/utils/wallet';
 import { PublicKey } from '@solana/web3.js';
 
@@ -110,7 +134,14 @@ export default defineComponent({
   name: 'Index',
   components: {},
   setup() {
-    const publicKey = selectedWallet.value?.adapter.publicKey;
+    const $route = useRoute();
+    const $q = useQuasar();
+
+    const calendarPubkey =
+      $route.name == 'schedule'
+        ? new PublicKey($route.params.id as string)
+        : selectedWallet.value?.adapter.publicKey;
+
     const now = new Date(Date.now());
     const selectedDateString = ref(dateUtils.formatDate(now, 'YYYY/MM/DD'));
 
@@ -126,17 +157,26 @@ export default defineComponent({
         .reverse();
     });
 
+    watch(currentDayTimeSlots, (slots) => {
+      console.log(slots.map((x) => x.id.toString()));
+      console.log(
+        slots.map((x) =>
+          x.scheduledWith ? x.scheduledWith.toString() : 'null'
+        )
+      );
+    });
+
     // Watch the selected date string and update the selected date
     const selectedDate = computed(() => {
       return new Date(Date.parse(selectedDateString.value));
     });
 
-    if (publicKey) {
-      void getTimeSlots(publicKey).then((slots) => {
+    if (calendarPubkey) {
+      void getTimeSlots(calendarPubkey).then((slots) => {
         timeSlots.value = slots;
       });
 
-      subscribeToTimeSlots(publicKey, (timeSlot) => {
+      subscribeToTimeSlots(calendarPubkey, (timeSlot) => {
         const newTimeSlots = timeSlots.value.filter((x) => x.id != timeSlot.id);
         newTimeSlots.push(timeSlot);
         timeSlots.value = newTimeSlots;
@@ -149,6 +189,8 @@ export default defineComponent({
       currentDayTimeSlots,
       addTimeSlotStartTime,
       addTimeSlotEndTime,
+      $route,
+      calendarPubkey,
       async addTimeSlotButton() {
         const startDate = new Date(Date.parse(selectedDateString.value));
         startDate.setHours(
@@ -174,6 +216,27 @@ export default defineComponent({
 
         addTimeSlotStartTime.value = '';
         addTimeSlotEndTime.value = '';
+      },
+
+      scheduleMeetingButton(timeSlot: TimeSlot) {
+        if ($route.name != 'schedule') {
+          return;
+        }
+        if (!calendarPubkey) {
+          return;
+        }
+
+        $q.dialog({
+          title: 'Confirm',
+          message: `Would you like to schedule a meeting \
+          with this user at ${dateUtils.formatDate(
+            timeSlot.time.start,
+            'YYYY/MM/DD hh:mm A'
+          )}?`,
+          cancel: true,
+        }).onOk(() => {
+          void scheduleMeeting(timeSlot.id, 'TodoUseUsername');
+        });
       },
 
       // Utils

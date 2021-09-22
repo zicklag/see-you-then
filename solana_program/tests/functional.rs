@@ -3,10 +3,8 @@
 
 use std::str::FromStr;
 
-use borsh::{BorshDeserialize, BorshSerialize};
-use see_you_then::{
-    create_time_slot, schedule_meeting, Reservation, SeeYouThenInstruction, TimeSlot, TimeSlotTime,
-};
+use borsh::BorshDeserialize;
+use see_you_then::{create_time_slot, schedule_meeting, Reservation, TimeSlot, TimeSlotTime};
 use solana_program::{system_instruction, system_program};
 
 use {
@@ -107,11 +105,7 @@ async fn time_slot_create_and_schedule() {
         Some(&scheduling_keypair.pubkey()),
     );
     transaction.sign(
-        &[
-            &scheduling_keypair,
-            &reservation_keypair,
-            &time_slot_keypair,
-        ],
+        &[&scheduling_keypair, &reservation_keypair],
         recent_blockhash,
     );
     banks_client.process_transaction(transaction).await.unwrap();
@@ -159,30 +153,11 @@ async fn time_slot_create_and_schedule() {
         Some(&scheduling_keypair.pubkey()),
     );
     transaction.sign(
-        &[
-            &scheduling_keypair,
-            &reservation_2_keypair,
-            &time_slot_keypair,
-        ],
+        &[&scheduling_keypair, &reservation_2_keypair],
         recent_blockhash,
     );
     let result = banks_client.process_transaction(transaction).await;
 
     // Make sure that it doesn't let us double-book
     assert_eq!(result.is_err(), true);
-}
-
-#[test]
-fn dump_time_slot_time() {
-    let data = SeeYouThenInstruction::CreateTimeSlot {
-        time: TimeSlotTime {
-            start: 0.0,
-            end: 120.0,
-        },
-        meeting_id: String::from("My meeting"),
-    }
-    .try_to_vec()
-    .expect("IO error");
-
-    panic!("{:?}", data);
 }

@@ -78,7 +78,7 @@ pub fn schedule_meeting(
         accounts: vec![
             AccountMeta::new(scheduling_account, true),
             AccountMeta::new(reservation_account, true),
-            AccountMeta::new(time_slot_account, true),
+            AccountMeta::new(time_slot_account, false),
             AccountMeta::new_readonly(system_program::id(), false),
         ],
         data: SeeYouThenInstruction::ScheduleMeeting { user_name }
