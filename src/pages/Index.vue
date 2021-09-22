@@ -13,6 +13,7 @@
             filled
             type="time"
             label="Start Time"
+            stack-label
           />
           <q-input
             class="q-ma-md"
@@ -20,6 +21,7 @@
             filled
             type="time"
             label="End Time"
+            stack-label
           />
         </q-card-section>
 
@@ -42,7 +44,7 @@
         class="q-ma-md"
         :events="calendarEventsHighlighter"
       />
-      <q-list bordered>
+      <q-list bordered separator>
         <q-item>
           <q-item-section>
             <q-item-label class="text-h5"> Time Slots</q-item-label>
@@ -58,6 +60,26 @@
             </q-btn>
           </q-item-section>
         </q-item>
+        <q-item v-for="timeSlot in currentDayTimeSlots" :key="timeSlot.id">
+          <q-item-section>
+            <q-item-label>
+              {{ format_time(timeSlot.time.start) }} -
+              {{ format_time(timeSlot.time.end) }}
+            </q-item-label>
+            <q-item-label caption>
+              {{
+                timeSlot.scheduledWith
+                  ? `Scheduled with ${format_pubkey(timeSlot.scheduledWith)}`
+                  : 'Open'
+              }}
+            </q-item-label>
+          </q-item-section>
+        </q-item>
+        <q-item v-if="currentDayTimeSlots.length == 0">
+          <q-item-section>
+            <q-item-label caption> No time slots for this day </q-item-label>
+          </q-item-section>
+        </q-item>
         <q-separator />
       </q-list>
     </div>
@@ -65,15 +87,24 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from 'vue';
+import { defineComponent, ref, computed } from 'vue';
 import {
   createTimeSlot,
   getTimeSlots,
   subscribeToTimeSlots,
   TimeSlot,
 } from '../utils/backend';
-import { date } from 'quasar';
+import { date as dateUtils } from 'quasar';
 import { selectedWallet } from 'src/utils/wallet';
+import { PublicKey } from '@solana/web3.js';
+
+function is_same_day(date1: Date, date2: Date): boolean {
+  return (
+    date1.getFullYear() == date2.getFullYear() &&
+    date1.getMonth() == date2.getMonth() &&
+    date1.getDate() == date2.getDate()
+  );
+}
 
 export default defineComponent({
   name: 'Index',
@@ -81,18 +112,23 @@ export default defineComponent({
   setup() {
     const publicKey = selectedWallet.value?.adapter.publicKey;
     const now = new Date(Date.now());
-    const selectedDateString = ref(date.formatDate(now, 'YYYY/MM/DD'));
-    const selectedDate = ref(Date.parse(selectedDateString.value));
+    const selectedDateString = ref(dateUtils.formatDate(now, 'YYYY/MM/DD'));
 
     const showAddTimeSlotDialog = ref(false);
     const addTimeSlotStartTime = ref('');
     const addTimeSlotEndTime = ref('');
     const timeSlots = ref<TimeSlot[]>([]);
 
+    const currentDayTimeSlots = computed(() => {
+      return timeSlots.value
+        .filter((x) => is_same_day(selectedDate.value, x.time.start as Date))
+        .sort()
+        .reverse();
+    });
+
     // Watch the selected date string and update the selected date
-    watch(selectedDateString, (newSelectedDate) => {
-      selectedDate.value = Date.parse(newSelectedDate);
-      console.log(date.formatDate(selectedDate.value, 'YYYY/MM/DD'));
+    const selectedDate = computed(() => {
+      return new Date(Date.parse(selectedDateString.value));
     });
 
     if (publicKey) {
@@ -110,20 +146,9 @@ export default defineComponent({
     return {
       showAddTimeSlotDialog,
       selectedDateString,
+      currentDayTimeSlots,
       addTimeSlotStartTime,
       addTimeSlotEndTime,
-      calendarEventsHighlighter(dateStr: string) {
-        const date = new Date(Date.parse(dateStr));
-
-        return timeSlots.value.reduce((acc, slot) => {
-          return (
-            (slot.time.start.getFullYear() == date.getFullYear() &&
-              slot.time.start.getMonth() == date.getMonth() &&
-              slot.time.start.getDay() == date.getDay()) ||
-            acc
-          );
-        }, false);
-      },
       async addTimeSlotButton() {
         const startDate = new Date(Date.parse(selectedDateString.value));
         startDate.setHours(
@@ -141,11 +166,34 @@ export default defineComponent({
         );
 
         console.log({
-          start: date.formatDate(startDate, 'YYYY/MM/DD HH:mm A'),
-          end: date.formatDate(endDate, 'YYYY/MM/DD HH:mm A'),
+          start: dateUtils.formatDate(startDate, 'YYYY/MM/DD hh:mm A'),
+          end: dateUtils.formatDate(endDate, 'YYYY/MM/DD hh:mm A'),
         });
 
         await createTimeSlot(startDate, endDate);
+
+        addTimeSlotStartTime.value = '';
+        addTimeSlotEndTime.value = '';
+      },
+
+      // Utils
+      format_time(date: Date): string {
+        return dateUtils.formatDate(date, 'hh:mm A');
+      },
+      format_pubkey(pubkey: PublicKey): string {
+        let keystring = pubkey.toString();
+        return (
+          keystring.substr(0, 4) +
+          '...' +
+          keystring.substring(keystring.length - 4, keystring.length)
+        );
+      },
+      calendarEventsHighlighter(dateStr: string) {
+        const date = new Date(Date.parse(dateStr));
+
+        return timeSlots.value.reduce((acc, slot) => {
+          return is_same_day(date, slot.time.start as Date) || acc;
+        }, false);
       },
     };
   },
